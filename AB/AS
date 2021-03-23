@@ -1,0 +1,328 @@
+title: "Read GUI data"
+author: "Anthony Staines & Andrea Bowe"
+date: "28/02/2021"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+library(expss)
+library(haven)
+library(tidyverse)
+
+set.seed(8534476)
+
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+# Read the SPSS data file
+
+```{r}
+GUI_1235 <- read_sav('data/GUI_1235Merge.sav')
+
+#glimpse(GUI_1235)
+
+write_csv(file='data/GUI_1235.csv',x=GUI_1235)
+```
+
+# Selecting a small subset of variables
+
+```{r}
+
+GUI_Filtered <- GUI_1235 %>% select(ID, xxwave1, xxwave2, xxwave3, xxwave5,
+                                    MMa5ap2, MML34, FF13, hsdclass, xhsdclass, EIncQuin,WGT_9YRb,
+                                    b2_psraw, b2_psabscore, b2_pspercentile,b2_pstscore, b2_nvabscore,
+                                    b2_nvpercentile, b2_nvrawscore, b2_nvtscore,
+                                    b2_SDQconduct, b2_SDQemotional, b2_SDQhyper, b2_SDQpeerprobs,
+                                    b2_SDQtotaldiffs, b2_SDQprosocial,
+                                    b3_psabscore, b3_pstscore, b3_pspercentile, b3_nvabscore,
+                                    b3_nvpercentile, b3_nvtscore,
+                                    b3_sdqemotional, b3_sdqconduct, b3_sdqhyper, b3_sdqpeerprobs,
+                                    b3_sdqprosocial, b3_sdqtotaldiffs,
+                                    WGT_9YRb,
+                                    b5_SDQconduct, b5_SDQemotional, b5_SDQhyper, b5_SDQpeerprobs,
+                                    b5_SDQprosocial, b5_SDQtotaldiffs)
+```
+
+# Rename variables with nonintuitive names
+Note that I've assumed the *ability scores* are the definitive scores for the Picture similarities and Naming Vocabulary test.
+
+## The ability scores are a transformation of the raw scores which take into account the specific set of items the participant was presented with. Participants will complete sets of items of varied degrees of difficulty depending on their ability. The t-score adjusts for the age the child took the test at. It is adjusted for 3-month age bands. I had used the t-score for the cognitive groupings.
+
+
+```{r}
+
+GUI_Filtered <- GUI_Filtered %>% rename(Primarycaregiver_HighestLevelofEducation_Wave1 = MML34,
+                                        Secondarycaregiver_Highestlevelofeducation = FF13)
+GUI_Filtered <- GUI_Filtered %>% rename(PictureSimilarities_rawscore_Age_3 = b2_psraw,
+                                        PictureSimilarities_score_Age_3 = b2_psabscore,
+                                        PictureSimilarities_percentile_Age_3 = b2_pspercentile,
+                                        PictureSimilarities_tscore_Age_3 = b2_pstscore)
+GUI_Filtered <- GUI_Filtered %>% rename(Namingvocab_rawscore_Age_3 = b2_nvrawscore,
+                                        Namingvocab_score_Age_3 = b2_nvabscore,
+                                        Namingvocab_percentile_Age_3 = b2_nvpercentile,
+                                        Namingvocab_tscore_Age_3 = b2_nvtscore)
+GUI_Filtered <- GUI_Filtered %>% rename(PictureSimilarities_score_Age_5 = b3_psabscore,
+                                        PictureSimilarities_percentile_Age_5 = b3_pspercentile,
+                                        PictureSimilarities_tscore_Age_5 = b3_pstscore)
+GUI_Filtered <- GUI_Filtered %>% rename(Namingvocab_score_Age_5 = b3_nvabscore,
+                                        Namingvocab_percentile_Age_5 = b3_nvpercentile,
+                                        Namingvocab_tscore_Age_5 = b3_nvtscore)
+GUI_Filtered <- GUI_Filtered %>% rename(SDQTotal_score_Age_3 = b2_SDQtotaldiffs, SDQEmotional_score_Age_3 = b2_SDQemotional,
+                                        SDQConduct_score_Age_3 = b2_SDQconduct, SDQHyperactivity_score_Age_3 = b2_SDQhyper,
+                                        SDQPeerproblems_score_Age_3 = b2_SDQpeerprobs, Prosocial_score_Age_3 = b2_SDQprosocial)
+GUI_Filtered <- GUI_Filtered %>% rename(SDQTotal_score_Age_5 = b3_sdqtotaldiffs, SDQEmotional_score_Age_5 = b3_sdqemotional,
+                                        SDQConduct_score_Age_5 = b3_sdqconduct, SDQHyperactivity_score_Age_5 = b3_sdqhyper,
+                                        SDQPeerproblems_score_Age_5 = b3_sdqpeerprobs, Prosocial_score_Age_5 = b3_sdqprosocial)
+GUI_Filtered <- GUI_Filtered %>% rename(SDQTotal_score_Age_9 = b5_SDQtotaldiffs, SDQEmotional_score_Age_9 = b5_SDQemotional,
+                                        SDQConduct_score_Age_9 = b5_SDQconduct, SDQHyperactivity_score_Age_9 = b5_SDQhyper,
+                                        SDQPeerproblems_score_Age_9 = b5_SDQpeerprobs, Prosocial_score_Age_9 = b5_SDQprosocial)
+summary(GUI_Filtered)
+```
+
+# Pivot to long
+I've renamed all the variables for the scores so they fit a common pattern.
+
+```{r}
+GUI_ <- GUI_Filtered %>% pivot_longer(cols=PictureSimilarities_rawscore_Age_3:SDQTotal_score_Age_9,
+                              names_to=c('Test','Measure','Age'),
+                              names_pattern = '(.*)_(.*)_Age_(.*)',
+                              values_to = 'Value')
+
+GUI_RND <- GUI_ %>%
+  select(ID) %>%
+  distinct() %>%
+  mutate(RND = runif(n()))
+
+GUI_ <- GUI_ %>%
+  left_join(GUI_RND, by = 'ID') # Random number for each ID
+
+rm(GUI_RND)
+```
+
+# Some tables and data
+
+```{r}
+TABLE <- GUI_ %>%
+  filter(Measure == 'score') %>%
+  tab_cells(Value) %>%
+  tab_cols(Age) %>%
+  tab_rows(Test) %>%
+  tab_stat_fun(N = w_n, 'Mean' = w_mean, 'Std. dev.' = w_sd) %>%
+  tab_pivot()
+
+```
+
+```{r}
+TABLE
+```
+
+```{r}
+knitr::kable(TABLE)
+```
+
+```{r}
+pander::pander(TABLE)
+```
+
+```{r, results='asis'}
+TABLE
+```
+
+```{r, results='asis'}
+knitr::kable(TABLE)
+```
+
+```{r, results='asis'}
+pander::pander(TABLE)
+```
+
+# Some graphs
+
+```{r}
+Working  <- GUI_ %>%
+  filter(Measure == 'score' & str_detect(Test, 'SDQ'))
+
+ggplot(Working,
+       aes(x=Age, y= Value, group = ID)) +
+  geom_jitter(colour = 'lightgreen', alpha=0.01) +
+  geom_line(data = Working %>% filter(RND < 0.05),
+            colour='red', alpha=0.02) +
+  ggtitle('Data and sample trajectories') +
+  theme_minimal() +
+  facet_grid(~Test)
+
+
+```
+
+# River plots (failed)
+
+These work, but they look awful. Too many groups, basically.
+
+```{r, eval=FALSE, echo=FALSE}
+library(riverplot)
+
+# Very famous plot.
+data(minard)
+nodes <- minard$nodes
+edges <- minard$edges
+colnames(nodes) <- c("ID", "x", "y")
+colnames(edges) <- c("N1", "N2", "Value", "direction")
+str(nodes)
+str(edges)
+
+#Nodes are Age and Score value Flows are number of people on each end
+Working <- GUI_ %>%
+  select(ID, Age, Test, Value) %>%
+  filter(Test == 'SDQConduct') %>%
+  filter(!is.na(Value))
+  
+Count <- Working %>% group_by(ID) %>% summarise(N=n()) %>% filter(N>1)
+
+Working <- right_join(Working,Count, by = 'ID') %>%
+  mutate(Node = paste0(Age,'-',Value))
+
+NODES <- Working %>% select(ID = Node, x = Age, y = Value) %>% distinct() %>% mutate(x = as.numeric(x))
+str(NODES)
+#Working <-
+  # for each person
+  # Value at age 3 and Value at age 5 define one flow of 1 from Node 3 to Node 5
+  # Value at age 5 and Value at age 9 define another flow of 1
+EDGES <- Working %>%
+  pivot_wider(id_cols = ID, names_from = Age, names_prefix= 'Node_', values_from = Node) %>%
+  mutate(One = if_else(!is.na(Node_3) & !is_na(Node_5), paste(Node_3,Node_5), NA_character_)) %>%
+  mutate(Two = if_else(!is.na(Node_5) & !is_na(Node_9), paste(Node_5,Node_9), NA_character_)) %>%
+  select(One, Two)
+
+
+EDGES <- EDGES %>%
+  pivot_longer(everything(), names_to = 'Time', values_to='Transition') %>%
+  filter(!is.na(Transition)) %>% group_by(Transition) %>%  summarise(N = n())
+
+EDGES <- EDGES %>%
+  mutate(N1 = str_extract(Transition,'\\d+-\\d+')) %>%
+  mutate(N2 = str_replace(str_extract(Transition,' \\d+-\\d+'),' ','')) %>%
+  mutate(Value = N) %>%
+  select(N1,N2,Value)
+
+  
+River <- makeRiver(as.data.frame(NODES), as.data.frame(EDGES %>% filter(Value>20)))
+
+plot(River)
+
+class(NODES)
+class(EDGES)
+```
+
+# Alluvial plots (succeeded)
+
+```{r}
+library(ggalluvial)
+
+# Restricted data set to work on.
+Working <- GUI_ %>%
+  select(ID, Age, Test, Value) %>%
+  filter(Test == 'SDQConduct') %>%
+  filter(!is.na(Value))
+  
+# count the number of occasions each chid was seen, and lose those seen only once.
+Count <- Working %>% group_by(ID) %>% summarise(N=n()) %>% filter(N>1)
+
+# Create a lable of Age-Value for each row.
+Working <- right_join(Working,Count, by = 'ID') %>%
+  mutate(Node = paste0(Age,'-',Value))
+
+# Now we make the flow dataframe.
+## First, get a dataset with the responses on each occasion
+TEST <- Working %>%
+  pivot_wider(id_cols = ID, names_from = Age, names_prefix= 'Age_', values_from = Value) %>%
+  arrange(Age_3,Age_5,Age_9) %>%
+  select(-ID)
+
+## Then calculate how often each response occurs.
+TEST <- TEST %>%
+  mutate(Response = paste(Age_3,Age_5,Age_9)) %>% # The actual response pattern
+  group_by(Age_3,Age_5,Age_9) %>%
+  mutate(freq=n()) %>%
+  ungroup() %>%
+  distinct()
+
+## Get back to flows, by Age, and create an ordered factor for the scores (0 to 10)
+TEST <- TEST %>%
+  pivot_longer(c(Age_3,Age_5,Age_9), names_to = 'Age', values_to='Value', names_prefix = 'Age_') %>%
+  filter(!is.na(Value)) %>%
+### Make a factor, levels in reverse numeric order 10,9,8,...  
+  mutate(ValueF = fct_rev(fct_inseq(as_factor(Value),ordered=TRUE)))
+
+## Make a unique ID for each response - needed by geom_flow
+ID <- TEST %>%
+  select(Response) %>% distinct() %>% mutate(ID = row_number())
+
+## Join the ID to TEST
+TEST <- TEST %>%
+  inner_join(ID, by = "Response")
+
+## See what we have made.
+  str(TEST)
+  levels(TEST$ValueF)
+  glimpse(TEST)
+
+# Draw some pictures
+ggplot(TEST, aes(x = Age, stratum = ValueF, alluvium=ID,
+                 y=freq, fill=ValueF, colour=ValueF)) +
+  scale_x_discrete(expand = c(.1, .1)) +
+  geom_flow() +
+  geom_stratum(alpha = 1) +
+  geom_text(stat = "stratum", colour='darkblue', aes(label = after_stat(stratum))) +
+  scale_fill_brewer(type='div', palette='Spectral') +
+  ggtitle("SDQConduct scores at three points in time", subtitle = 'All cases') +
+  ylab('Frequency of occurrence') + xlab('Age at wave') +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+ggplot(TEST %>% filter(freq > 25), aes(x = Age, stratum = ValueF, alluvium=ID,
+                 y=freq, fill=ValueF, colour=ValueF)) +
+  scale_x_discrete(expand = c(.1, .1)) +
+  geom_flow() +
+  geom_stratum(alpha = 1) +
+  geom_text(stat = "stratum", colour='darkblue', aes(label = after_stat(stratum))) +
+  scale_fill_brewer(type='div', palette='Spectral') +
+  ggtitle("SDQConduct scores at three points in time", subtitle = 'Frequency of occurrence over 25') +
+  ylab('Frequency of occurrence') + xlab('Age at wave') +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+ggplot(TEST %>% filter(freq <= 25), aes(x = Age, stratum = ValueF, alluvium=ID,
+                 y=freq, fill=ValueF, colour=ValueF)) +
+  scale_x_discrete(expand = c(.1, .1)) +
+  geom_flow() +
+  geom_stratum(alpha = 1) +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_fill_brewer(type='div', palette='Spectral') +
+  ggtitle("SDQConduct scores at three points in time", subtitle = 'Frequency of occurrence 25 and under') +
+  ylab('Frequency of occurrence') + xlab('Age at wave') +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
+
+##Cognitive groupings based on t-score Picture Similarities Scale Age 3
+
+```{r}
+
+##Cognitive groupings
+x <- mean(GUI_Filtered$PictureSimilarities_tscore_Age_3, na.rm = TRUE)
+y <- sd(GUI_Filtered$PictureSimilarities_tscore_Age_3, na.rm = TRUE)
+##1SD cut off
+z <- x-y
+w <- x-y-y
+GUI_Filtered$Cognitive_nonverbal_Age3Cat <- 99
+##Splits cognitive variable into those with score 1-2SD below the mean and those with score >1SD below the mean with those <2D excluded and coded as 99 along with missing variables.
+GUI_Filtered$Cognitive_nonverbal_Age3Cat[31.485<= GUI_Filtered$PictureSimilarities_tscore_Age_3 & GUI_Filtered$PictureSimilarities_tscore_Age_3<=42.304] <- 1
+GUI_Filtered$Cognitive_nonverbal_Age3Cat[42.304 < GUI_Filtered$PictureSimilarities_tscore_Age_3] <- 0
+table(GUI_Filtered$Cognitive_nonverbal_Age3Cat)
+
+
